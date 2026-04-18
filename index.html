@@ -443,6 +443,50 @@
         { id: 4, title: "无滤镜原教旨", desc: "连续发布 10 篇无滤镜实拍评价", icon: <Camera className="w-8 h-8 text-gray-400" />, unlocked: false, progress: 6, target: 10, color: "from-gray-300 to-gray-400", bg: "bg-gray-100" }
       ];
 
+      const interestUsers = [
+        {
+          id: 'su-1',
+          name: '曼谷不睡觉',
+          avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
+          bio: '周末飞行选手，最爱夜市和路边摊，喜欢松弛但有节奏的城市暴走。',
+          tags: ['夜市控', '轻社交', '拍照党'],
+          common: '同样收藏了辉煌夜市',
+          activeText: '10分钟前',
+          contact: { wechat: 'bangkok_nightowl', email: 'nightowl@gowow-demo.com', instagram: '@bangkok.nightowl' }
+        },
+        {
+          id: 'su-2',
+          name: '阿Ken在路上',
+          avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop',
+          bio: '攻略做得很细，预算有数，但现场也愿意临时改计划。',
+          tags: ['攻略控', '预算敏感', '夜游'],
+          common: '同样点赞了夜市玩法',
+          activeText: '刚刚在线',
+          contact: { wechat: 'aken_route', email: 'aken@gowow-demo.com', instagram: '@aken.route' }
+        },
+        {
+          id: 'su-3',
+          name: '吃遍亚洲',
+          avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=150&auto=format&fit=crop',
+          bio: '旅行只为本地小吃，落地后的第一件事永远是找夜市。',
+          tags: ['觅食', '暴走', '本地路线'],
+          common: '同样想拼周末曼谷局',
+          activeText: '1小时前',
+          contact: { wechat: 'eatallasia', email: 'eat@gowow-demo.com', instagram: '@eat.all.asia' }
+        }
+      ];
+
+      const socialData = {
+        chats: [
+          { id: 1, author: interestUsers[0], time: '刚刚', preview: '我已经把夜市集合点发群里了', unread: 2 },
+          { id: 2, author: interestUsers[1], time: '12:18', preview: '你更想先吃还是先拍？', unread: 0 },
+          { id: 3, author: interestUsers[2], time: '昨天', preview: '我周五落地后直接去夜市', unread: 0 }
+        ],
+        joinedGroups: [
+          { id: 1, name: '曼谷夜市暴走局', time: '本周五 20:00 · 夜市觅食', members: '128/500', unread: 8 }
+        ]
+      };
+
       const memeAchievements = [
         {
           id: 'm1',
@@ -1253,7 +1297,7 @@
       };
 
       // 9. Author Chat 发布者对话页
-      const ScreenAuthorChat = ({ navigate, author, chatMessages, onSendMessage }) => {
+      const ScreenAuthorChat = ({ navigate, author, chatMessages, onSendMessage, backTarget = 'home' }) => {
         const [input, setInput] = useState('');
 
         const handleSend = () => {
@@ -1270,7 +1314,7 @@
             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 25% 20%, rgba(255,255,255,0.2) 0 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
 
             <div className="relative z-20 px-4 pt-12 pb-3 bg-black/20 backdrop-blur-md border-b border-white/10 flex items-center gap-3">
-              <button onClick={() => navigate('feedDetail')} className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center"><ChevronLeft className="w-5 h-5" /></button>
+              <button onClick={() => navigate(backTarget)} className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center"><ChevronLeft className="w-5 h-5" /></button>
               <img src={author?.avatar} alt={author?.name} className="w-9 h-9 rounded-full object-cover border border-white/20" />
               <div>
                 <p className="text-sm font-bold">{author?.name || '发布者'}</p>
@@ -1564,45 +1608,28 @@
         );
       };
 
-      // 6. Social 社交页（首版骨架）
-      const ScreenSocialHub = ({ navigate }) => {
-        const recommendedUser = {
-          name: '曼谷不睡觉',
-          avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
-          activeText: '10分钟前',
-          tags: ['夜市控', '轻社交', '拍照党'],
-          matchText: '同样收藏了辉煌夜市',
-          nextName: '阿Ken在路上',
-          nextAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop',
+      // 6. Social 社交页
+      const ScreenSocialHub = ({ navigate, openAuthorChat }) => {
+        const [recommendationIndex, setRecommendationIndex] = useState(0);
+        const [exitDirection, setExitDirection] = useState(null);
+        const recommendationUsers = interestUsers;
+        const currentUser = recommendationUsers[recommendationIndex] || recommendationUsers[0];
+        const nextUser = recommendationUsers[(recommendationIndex + 1) % recommendationUsers.length];
+
+        const nextRecommendation = (direction) => {
+          if (exitDirection) return;
+          setExitDirection(direction);
+          setTimeout(() => {
+            setRecommendationIndex(prev => prev >= recommendationUsers.length - 1 ? 0 : prev + 1);
+            setExitDirection(null);
+          }, 260);
         };
 
-        const recentChats = [
-          {
-            id: 1,
-            name: '曼谷不睡觉',
-            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
-            time: '刚刚',
-            message: '我已经把夜市集合点发群里了',
-            unread: 2,
-          },
-          {
-            id: 2,
-            name: '阿Ken在路上',
-            avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop',
-            time: '12:18',
-            message: '你更想先吃还是先拍？',
-          },
-        ];
-
-        const joinedGroups = [
-          {
-            id: 1,
-            name: '曼谷夜市暴走局',
-            time: '本周五 20:00 · 夜市觅食',
-            members: '128/500',
-            unread: 8,
-          },
-        ];
+        const activeTransform = exitDirection === 'skip'
+          ? 'translate(-115%, 8%) rotate(-14deg)'
+          : exitDirection === 'like'
+            ? 'translate(115%, 8%) rotate(14deg)'
+            : 'translate(0, 0) rotate(0deg)';
 
         return (
           <div className="relative w-full h-full bg-[#F3F4F6] flex flex-col font-sans overflow-hidden text-gray-900">
@@ -1619,7 +1646,7 @@
                     <p className="text-[11px] text-gray-500 mt-1">基于共同地点、玩法和旅行风格推荐</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-bold text-gray-400">1/3</span>
+                    <span className="text-[11px] font-bold text-gray-400">{recommendationIndex + 1}/{recommendationUsers.length}</span>
                     <span className="text-orange-500 text-[11px] font-bold">查看更多</span>
                   </div>
                 </div>
@@ -1628,36 +1655,36 @@
                   <div className="absolute inset-x-3 top-2 bottom-0 rounded-[28px] bg-gradient-to-b from-gray-200 to-gray-100 scale-[0.98] opacity-90"></div>
                   <div className="absolute inset-x-6 top-4 bottom-0 rounded-[28px] bg-gradient-to-b from-gray-300 to-gray-100 scale-[0.95] opacity-70"></div>
 
-                  <div className="absolute inset-0 rounded-[28px] overflow-hidden bg-white shadow-xl border border-gray-100 p-4">
+                  <div className="absolute inset-0 rounded-[28px] overflow-hidden bg-white shadow-xl border border-gray-100 p-4 transition-all duration-300 ease-out" style={{ transform: activeTransform, opacity: exitDirection ? 0 : 1 }}>
                     <div className="flex items-center gap-3 min-w-0">
-                      <img className="w-16 h-16 rounded-[20px] object-cover" src={recommendedUser.avatar} alt="avatar" />
+                      <img className="w-16 h-16 rounded-[20px] object-cover" src={currentUser.avatar} alt="avatar" />
                       <div className="min-w-0">
-                        <div className="text-xl font-black truncate">{recommendedUser.name}</div>
-                        <div className="text-[11px] text-gray-500 mt-1">{recommendedUser.activeText}</div>
+                        <div className="text-xl font-black truncate">{currentUser.name}</div>
+                        <div className="text-[11px] text-gray-500 mt-1">{currentUser.activeText}</div>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap gap-1.5 mt-3">
-                      {recommendedUser.tags.map((tag) => (
+                      {currentUser.tags.map((tag) => (
                         <span key={tag} className="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-[10px] font-bold">{tag}</span>
                       ))}
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      <span className="px-2.5 py-1.5 rounded-full bg-orange-50 text-orange-700 text-[10px] font-bold border border-orange-100">{recommendedUser.matchText}</span>
+                      <span className="px-2.5 py-1.5 rounded-full bg-orange-50 text-orange-700 text-[10px] font-bold border border-orange-100">{currentUser.common}</span>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 mt-3">
-                      <button onClick={() => alert('已跳过该推荐，下一位会继续为你匹配')} className="py-2.5 rounded-2xl bg-gray-100 text-gray-600 text-xs font-black">跳过</button>
-                      <button onClick={() => alert('演示版已接入私聊入口，你也可以从素材卡进入对话')} className="py-2.5 rounded-2xl bg-gray-900 text-white text-xs font-black">去私聊</button>
-                      <button onClick={() => alert('已标记喜欢，后续会继续为你推荐相似用户')} className="py-2.5 rounded-2xl bg-orange-500 text-white text-xs font-black">喜欢</button>
+                      <button onClick={() => nextRecommendation('skip')} className="py-2.5 rounded-2xl bg-gray-100 text-gray-600 text-xs font-black">跳过</button>
+                      <button onClick={() => openAuthorChat(currentUser)} className="py-2.5 rounded-2xl bg-gray-900 text-white text-xs font-black">去私聊</button>
+                      <button onClick={() => nextRecommendation('like')} className="py-2.5 rounded-2xl bg-orange-500 text-white text-xs font-black">喜欢</button>
                     </div>
 
                     <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-gray-50 px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <img className="w-9 h-9 rounded-xl object-cover" src={recommendedUser.nextAvatar} alt="next" />
+                        <img className="w-9 h-9 rounded-xl object-cover" src={nextUser.avatar} alt="next" />
                         <div className="min-w-0">
-                          <div className="text-xs font-black text-gray-900 truncate">{recommendedUser.nextName}</div>
+                          <div className="text-xs font-black text-gray-900 truncate">{nextUser.name}</div>
                           <div className="text-[10px] text-gray-500 mt-0.5">下一位高契合推荐</div>
                         </div>
                       </div>
@@ -1673,15 +1700,15 @@
                   <span className="text-orange-500 text-[11px] font-bold">全部消息</span>
                 </div>
                 <div className="space-y-1.5">
-                  {recentChats.map((chat) => (
-                    <button key={chat.id} className="w-full flex items-center gap-3 rounded-2xl px-2 py-2 bg-white text-left">
-                      <img className="w-12 h-12 rounded-2xl object-cover" src={chat.avatar} alt={chat.name} />
+                  {socialData.chats.slice(0, 2).map((chat) => (
+                    <button key={chat.id} onClick={() => openAuthorChat(chat.author)} className="w-full flex items-center gap-3 rounded-2xl px-2 py-2 bg-white text-left">
+                      <img className="w-12 h-12 rounded-2xl object-cover" src={chat.author.avatar} alt={chat.author.name} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-sm font-black truncate">{chat.name}</div>
+                          <div className="text-sm font-black truncate">{chat.author.name}</div>
                           <div className="text-[10px] text-gray-400">{chat.time}</div>
                         </div>
-                        <div className="text-xs text-gray-500 truncate mt-1">{chat.message}</div>
+                        <div className="text-xs text-gray-500 truncate mt-1">{chat.preview}</div>
                       </div>
                       {chat.unread ? <span className="min-w-5 h-5 px-1.5 rounded-full bg-orange-500 text-white text-[10px] font-black flex items-center justify-center">{chat.unread}</span> : null}
                     </button>
@@ -1695,8 +1722,8 @@
                   <span className="text-orange-500 text-[11px] font-bold">查看更多</span>
                 </div>
                 <div className="space-y-3">
-                  {joinedGroups.map((group) => (
-                    <div key={group.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
+                  {socialData.joinedGroups.slice(0, 1).map((group) => (
+                    <button key={group.id} onClick={() => navigate('detail')} className="w-full text-left rounded-2xl bg-gray-50 border border-gray-100 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-black">{group.name}</div>
@@ -1708,7 +1735,7 @@
                         <div className="text-[11px] text-gray-400">成员 {group.members}</div>
                         <div className="text-[11px] font-bold text-orange-500">进入群组</div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </section>
@@ -1884,6 +1911,7 @@
         const [homeStartIndex, setHomeStartIndex] = useState(0);
         const [selectedAuthor, setSelectedAuthor] = useState(null);
         const [chatMap, setChatMap] = useState({});
+        const [chatBackTarget, setChatBackTarget] = useState('home');
 
         const openFeedDetail = (card, activeIndex) => {
           const fallbackIdx = feedCards.findIndex((item) => item.id === card.id);
@@ -1899,8 +1927,9 @@
           setCurrentPage('home');
         };
 
-        const openAuthorChat = (author) => {
+        const openAuthorChat = (author, returnTo = currentPage) => {
           setSelectedAuthor(author);
+          setChatBackTarget(returnTo);
           setCurrentPage('authorChat');
           setChatMap((prev) => {
             if (prev[author.name]) return prev;
@@ -1941,11 +1970,11 @@
               {currentPage === 'onboarding' && <ScreenOnboarding navigate={setCurrentPage} />}
               {currentPage === 'home' && <ScreenHomeFeed navigate={setCurrentPage} openFeedDetail={openFeedDetail} openAuthorChat={openAuthorChat} initialCardIndex={homeStartIndex} />}
               {currentPage === 'feedDetail' && <ScreenFeedDetail navigate={setCurrentPage} selectedCard={selectedFeedCard} openAuthorChat={openAuthorChat} goToNextFeedCard={goToNextFeedCard} />}
-              {currentPage === 'authorChat' && <ScreenAuthorChat navigate={setCurrentPage} author={selectedAuthor} chatMessages={chatMap[selectedAuthor?.name] || []} onSendMessage={sendChatMessage} />}
+              {currentPage === 'authorChat' && <ScreenAuthorChat navigate={setCurrentPage} author={selectedAuthor} chatMessages={chatMap[selectedAuthor?.name] || []} onSendMessage={sendChatMessage} backTarget={chatBackTarget} />}
               {currentPage === 'detail' && <ScreenPlaceDetail navigate={setCurrentPage} />}
               {currentPage === 'review' && <ScreenWriteReview navigate={setCurrentPage} />}
               {currentPage === 'planner' && <ScreenAITripPlanner navigate={setCurrentPage} />}
-              {currentPage === 'social' && <ScreenSocialHub navigate={setCurrentPage} />}
+              {currentPage === 'social' && <ScreenSocialHub navigate={setCurrentPage} openAuthorChat={openAuthorChat} />}
               {currentPage === 'profile' && <ScreenProfileGamification navigate={setCurrentPage} />}
 
             </div>

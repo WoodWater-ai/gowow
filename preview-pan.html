@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>gowow - 单文件 SPA 预览</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>
+      window.react = window.React;
+    </script>
+    <script src="https://unpkg.com/lucide-react@0.525.0/dist/umd/lucide-react.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      html,
+      body,
+      #root {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background: #0f172a;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="env,react">
+      const { useState, useEffect } = React;
+      const {
+        Search, Map: MapIcon, User, PlayCircle,
+        X, Heart, MapPin, Navigation, Star, Info,
+        Layers, MessageCircle, Share2, ArrowLeft, ArrowRight,
+        Flame, Sparkles, Compass, Bookmark,
+        Settings, Bell, Award, Trophy, ShieldCheck,
+        Lock, ChevronRight, Globe2, Camera, Tent,
+        ChevronLeft, ImagePlus, Send, AlertCircle, Edit3, Clock, ThumbsUp, Wallet
+      } = LucideReact;
+
+      // ================= 全局共享数据与样式 =================
+
+      const globalStyles = `
+        /* --- Onboarding Styles --- */
+        @keyframes spin-earth { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+        @keyframes rv-drive {
+          0% { transform: translate(-180px, 120px) rotate(-25deg) scale(0.5); opacity: 0; }
+          15% { transform: translate(-80px, 30px) rotate(-10deg) scale(0.8); opacity: 1; }
+          50% { transform: translate(0px, 0px) rotate(0deg) scale(1.1); opacity: 1; }
+          85% { transform: translate(80px, 30px) rotate(10deg) scale(0.8); opacity: 1; }
+          100% { transform: translate(180px, 120px) rotate(25deg) scale(0.5); opacity: 0; }
+        }
+        @keyframes rv-bounce { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-4px); } }
+        @keyframes speed-line { 0% { transform: translateX(100vw); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateX(-100vw); opacity: 0; } }
+        @keyframes star-twinkle { 0%, 100% { opacity: 0.1; transform: scale(0.6); } 50% { opacity: 1; transform: scale(1.2); } }
+        .earth-surface { animation: spin-earth 10s linear infinite; }
+        .rv-container { animation: rv-drive 2s cubic-bezier(0.4, 0, 0.2, 1) forwards; transform-origin: bottom center; }
+        .rv-body { animation: rv-bounce 0.35s ease-in-out infinite alternate; }
+
+        /* --- Loader Styles --- */
+        .loader-container { display: flex; height: 300px; width: 300px; justify-content: center; align-items: center; position: relative; flex-direction: column; transform: scale(0.9); }
+        .loader-moon { background-color: #39beff; height: 140px; width: 140px; border-radius: 50%; position: absolute; margin: auto; left: 0; right: 0; top: 0; bottom: 0; overflow: hidden; }
+        .loader-crater { background-color: #31b4ff; height: 25px; width: 25px; border-radius: 50%; position: relative; }
+        .loader-crater:before { content: ""; position: absolute; height: 20px; width: 20px; border-radius: 50%; box-shadow: -4px 0 0 2px #1ca4f9; top: 2px; left: 5px; }
+        .loader-crater1 { top: 22px; left: 75px; transform: scale(0.9); }
+        .loader-crater2 { bottom: 10px; left: 50px; transform: scale(0.6); }
+        .loader-crater3 { left: 10px; transform: scale(0.75); }
+        .loader-crater4 { left: 90px; top: 25px; transform: scale(1.18); }
+        .loader-crater5 { left: 25px; bottom: 5px; transform: scale(0.65); }
+        .loader-shadow { height: 160px; width: 160px; box-shadow: 18px 0 0 5px rgba(0, 0, 0, 0.15); border-radius: 50%; position: relative; bottom: 130px; right: 38px; }
+        .loader-eye { background-color: #161616; height: 10px; width: 10px; position: relative; border-radius: 50%; }
+        .loader-eye-l { bottom: 215px; left: 45px; }
+        .loader-eye-r { bottom: 225px; left: 85px; }
+        .loader-mouth { height: 4px; width: 8px; border: 2.5px solid #161616; position: relative; bottom: 220px; left: 65px; border-top: none; border-radius: 0 0 8px 8px; }
+        .loader-blush { background-color: #1ca4f9; height: 6px; width: 6px; position: relative; border-radius: 50%; }
+        .loader-blush1 { bottom: 230px; left: 35px; }
+        .loader-blush2 { bottom: 236px; left: 98px; }
+        .loader-orbit { height: 140px; width: 140px; border-radius: 50%; position: absolute; margin: auto; left: 0; right: 0; top: 0; bottom: 0; animation: loader-spin 4s infinite linear; }
+        @keyframes loader-spin { 100% { transform: rotate(360deg); } }
+        .loader-rv-wrapper { position: absolute; left: 50%; top: 0; height: 40px; width: 60px; transform: translate(-50%, -90%); }
+        .loader-fire { position: absolute; bottom: 6px; left: -12px; width: 15px; height: 6px; background: radial-gradient(ellipse at center, #ffec85 0%, #ffae34 40%, #ec760c 70%, #cd4606 90%, rgba(0, 0, 0, 0) 100%); border-radius: 50%; animation: loader-flame 0.3s infinite alternate; z-index: -1; transform-origin: right center; }
+        @keyframes loader-flame { 0% { transform: scaleX(1); opacity: 0.9; } 100% { transform: scaleX(1.5); opacity: 0.5; } }
+        .loader-curve { width: 100%; height: 100%; position: absolute; animation: loader-rotate 10s linear infinite; fill: transparent; pointer-events: none; }
+        @keyframes loader-rotate { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loader-curve text { letter-spacing: 13.5px; text-transform: uppercase; font-family: sans-serif; font-weight: bold; font-size: 1.05em; fill: #95d5ff; filter: drop-shadow(0 2px 8px rgb(21, 117, 207)); }
+        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(2); opacity: 0; } }
+        .beacon-pulse::before { content: ''; position: absolute; left: -50%; top: -50%; width: 200%; height: 200%; background-color: #f97316; border-radius: 50%; animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; z-index: -1; }
+        .perspective-1000 { perspective: 1000px; transform-style: preserve-3d; }
+
+        /* --- Write Review Styles --- */
+        @keyframes q-bounce { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
+        .animate-q-bounce { animation: q-bounce 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes globe-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes orbit-float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+        .globe-shell { position: relative; width: 290px; height: 290px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.95) 0 8%, rgba(147,197,253,0.7) 10%, rgba(37,99,235,0.95) 45%, rgba(3,7,18,1) 100%); box-shadow: inset -35px -35px 80px rgba(2,6,23,0.8), inset 25px 25px 60px rgba(255,255,255,0.15), 0 30px 80px rgba(15,23,42,0.25); }
+        .globe-surface { position: absolute; inset: -8%; border-radius: 50%; background-image: radial-gradient(circle at 30% 35%, rgba(255,255,255,0.18) 0 12%, transparent 13%), linear-gradient(90deg, rgba(255,255,255,0.14) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px); background-size: 140px 140px, 34px 34px, 34px 34px; animation: globe-rotate 22s linear infinite; opacity: 0.55; }
+        .globe-continents { position: absolute; inset: 0; animation: globe-rotate 30s linear infinite reverse; }
+        .globe-marker { position: absolute; width: 18px; height: 18px; border-radius: 999px; background: linear-gradient(180deg, #fb923c 0%, #f97316 100%); box-shadow: 0 0 0 6px rgba(249,115,22,0.18), 0 10px 30px rgba(249,115,22,0.3); }
+        .globe-orbit-card { animation: orbit-float 5s ease-in-out infinite; }
+
+        /* Utilities */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `;
+
+      // --- Data Models ---
+      const onboardingSlides = [
+        { id: 1, title: "拒绝流水线打卡", description: "深入街巷与山野，发现只有当地人知道的秘境。", image: "https://images.unsplash.com/photo-1527631746610-bca00a040d60?q=80&w=800&auto=format&fit=crop", icon: <Compass className="w-8 h-8 text-orange-500 mb-4" /> },
+        { id: 2, title: "只看真实的评价", description: "过滤滤镜与虚假营销。海量资深背包客的真实长评。", image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=800&auto=format&fit=crop", icon: <MessageCircle className="w-8 h-8 text-orange-500 mb-4" /> },
+        { id: 3, title: "开启沉浸式旅行", description: "预订特色露营地到定制公路旅行，一站式搞定深度游。", image: "https://images.unsplash.com/photo-1523987355523-c7b5b0dd90a7?q=80&w=800&auto=format&fit=crop", icon: <Tent className="w-8 h-8 text-orange-500 mb-4" /> }
+      ];
+
+      const feedCards = [
+        {
+          id: 1, type: 'attraction',
+          author: { name: "航拍世界", avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=150&auto=format&fit=crop" },
+          name: "绝美海岸线的上帝视角", location: "菲律宾·巴拉望", distance: "1,240 km",
+          postText: "租了一艘小船出海，用无人机拍到了这片不可思议的热带海岸！没有任何滤镜，大自然的颜色就是这么震撼。海水清澈见底，真正的避世天堂。",
+          aiIntro: "AI提炼：未被过度开发的纯天然热带海岸线，极其震撼的航拍视角。⚠️避坑：部分海域暗流较多，浮潜时务必听从向导指挥并穿戴救生衣。",
+          videos: ["https://vjs.zencdn.net/v/oceans.mp4", "https://images.unsplash.com/photo-1516690561799-46d8f74f9abf?q=80&w=600&auto=format&fit=crop"],
+          scores: { "自然": 5.0, "探险": 4.8, "出片": 5.0, "性价比": 4.0 }, quest: "✨ 秘境悬赏：首个无滤镜视频打卡，奖 500 探索币", mapCoords: { top: '35%', left: '45%' }
+        },
+        {
+          id: 2, type: 'attraction',
+          author: { name: "听海的人", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=150&auto=format&fit=crop" },
+          name: "无人沙滩的白噪音", location: "马尔代夫·隐秘环礁", distance: "3,850 km",
+          postText: "避开了人满为患的主岛，在这里哪怕只是静静地看着海浪拍打沙滩，都能坐上一整天。海浪声超级治愈，带上一本书，这才是度假的终极奥义。",
+          aiIntro: "AI提炼：极其宁静的隐秘沙滩，适合放空发呆和白噪音冥想。⚠️避坑：没有任何商业设施，需从主岛自带充足的饮用水和遮阳伞。",
+          videos: ["https://assets.codepen.io/3364143/7btrrd.mp4", "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=600&auto=format&fit=crop"],
+          scores: { "水质": 5.0, "宁静": 5.0, "治愈": 4.9, "便利": 2.0 }, quest: null, mapCoords: { top: '25%', left: '80%' }
+        },
+        {
+          id: 3, type: 'attraction',
+          author: { name: "旷野追风", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop" },
+          name: "阿尔卑斯的星空篝火", location: "瑞士·阿尔卑斯山区", distance: "7,100 km",
+          postText: "在山谷里生起篝火，听着木柴燃烧的噼啪声，抬头就是漫天繁星。没有手机信号，只有大自然的声音，这一刻内心的平静是无价的。",
+          aiIntro: "AI提炼：极具沉浸感的户外露营体验，篝火与星空绝配。⚠️避坑：山区夜间温差极大，务必带上羽绒睡袋。生火需在指定营地，并注意彻底熄灭火种。",
+          videos: ["https://assets.codepen.io/1462889/camp.mp4", "https://images.unsplash.com/photo-1523987355523-c7b5b0dd90a7?q=80&w=600&auto=format&fit=crop"],
+          scores: { "浪漫": 5.0, "露营": 5.0, "自然": 4.8, "安全": 3.5 }, quest: "🔥 热门挑战：评价即可瓜分 1000 探索币", mapCoords: { top: '55%', left: '60%' }
+        }
+      ];
+
+      const placeDetailData = {
+        name: "阿婆的隐秘冬阴功粉", type: "🥘 街头美食", location: "泰国·曼谷·辉煌区老巷23号", distance: "1.2 km",
+        openTime: "10:00 AM - 15:00 PM (卖完即止)",
+        aiIntro: "基于342篇真实笔记总结：这家没有招牌的街边摊是当地嘟嘟车司机的私藏。冬阴功汤底极其浓郁酸辣，海鲜鲜甜弹牙。⚠️避坑：环境极其简陋（就坐在马路边），无空调，必须提早去排队。",
+        tags: ["无滤镜认证", "本地人私藏", "重口味"],
+        scores: { '口味': 4.9, '环境': 1.2, '服务': 2.5, '特色': 4.8, '性价比': 5.0 },
+        images: ["https://images.unsplash.com/photo-1559314809-0d155014e29e?q=80&w=800&auto=format&fit=crop", "https://images.unsplash.com/photo-1564834724105-918b73d1b9e0?q=80&w=800&auto=format&fit=crop"],
+        reviews: [
+          { id: 1, user: { name: "老麦吃世界", avatar: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=150&auto=format&fit=crop" }, rating: 5.0, date: "2天前", content: "冬阴功汤底浓郁得化不开，海鲜新鲜得弹牙！环境大家看图吧，就几张塑料凳子坐在马路牙子上，但为了这口粉，绝对值得！老板娘虽然听不懂英语，但一直笑眯眯的。", images: ["https://images.unsplash.com/photo-1559314809-0d155014e29e?q=80&w=300&auto=format&fit=crop"], likes: 342 },
+          { id: 2, user: { name: "洁癖晚期", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=150&auto=format&fit=crop" }, rating: 1.5, date: "1周前", content: "慕名而来，大失所望！排队在太阳底下暴晒了半小时，桌子油腻腻的根本擦不干净，旁边还有摩托车开过的尾气。不会再来第二次了。", images: [], likes: 89 }
+        ]
+      };
+
+      const userProfileData = {
+        name: "背包客老麦", avatar: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop",
+        level: 4, title: "硬核避坑人", currentExp: 850, maxExp: 1000, coins: 3420,
+        stats: { countries: 5, cities: 12, reviews: 24 }
+      };
+
+      const profileBadges = [
+        { id: 1, title: "洲际漫游者", desc: "解锁全球 5 个不同的国家", icon: <Globe2 className="w-8 h-8 text-blue-500" />, unlocked: true, progress: 5, target: 5, color: "from-blue-400 to-indigo-500", bg: "bg-blue-50" },
+        { id: 2, title: "舌尖避雷针", desc: "发布 8 个真实详细的餐饮长评", icon: <Flame className="w-8 h-8 text-orange-500" />, unlocked: true, progress: 8, target: 8, color: "from-orange-400 to-red-500", bg: "bg-orange-50" },
+        { id: 3, title: "社区明灯", desc: "你的评价累计获得 100 次“有用”赞同", icon: <ShieldCheck className="w-8 h-8 text-purple-500" />, unlocked: true, progress: 128, target: 100, color: "from-purple-400 to-fuchsia-500", bg: "bg-purple-50" },
+        { id: 4, title: "无滤镜原教旨", desc: "连续发布 10 篇无滤镜实拍评价", icon: <Camera className="w-8 h-8 text-gray-400" />, unlocked: false, progress: 6, target: 10, color: "from-gray-300 to-gray-400", bg: "bg-gray-100" }
+      ];
+
+      const mainGroupData = {
+        name: "曼谷夜市暴走局",
+        city: "泰国·曼谷",
+        place: "辉煌夜市",
+        schedule: "本周五 20:00",
+        mode: "夜市觅食 / 攻略分享 / 约伴",
+        members: 128,
+        limit: 500,
+        gate: "喜欢该地点即可加入",
+        announcement: "本群以周五晚夜市觅食和真实攻略分享为主，广告和无关闲聊会被移除。",
+        pinned: "群主已整理好第一站到第三站的夜市路线，建议第一次去的人直接抄作业。"
+      };
+
+      const interestUsers = [
+        { id: 1, name: "曼谷不睡觉", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop", bio: "周末飞行选手，最爱夜市和路边摊", tags: ["夜市控", "轻社交", "拍照党"], nextTrip: "本周五去曼谷", common: "同样收藏了辉煌夜市", lastSeen: "10分钟前" },
+        { id: 2, name: "阿Ken在路上", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop", bio: "攻略做得很细，但现场也喜欢临时改计划", tags: ["攻略控", "预算敏感", "夜游"], nextTrip: "想拼周末曼谷局", common: "同样点赞了夜市玩法", lastSeen: "刚刚在线" },
+        { id: 3, name: "吃遍亚洲", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=150&auto=format&fit=crop", bio: "旅行只为本地小吃，能走绝不打车", tags: ["觅食", "暴走", "本地路线"], nextTrip: "周五晚到曼谷", common: "同样想进夜市群", lastSeen: "1小时前" }
+      ];
+
+      const groupMessages = [
+        { id: 1, user: "群主阿麦", text: "大家如果第一次去，建议 20:00 先在辉煌夜市北门集合。", mine: false },
+        { id: 2, user: "曼谷不睡觉", text: "我会提前半小时到，想先拍一下入口那条灯牌街。", mine: false },
+        { id: 3, user: "我", text: "有人想一起拼一条夜市觅食路线吗？", mine: true },
+        { id: 4, user: "阿Ken在路上", text: "我已经做了一版吃喝路线，等会发群公告里。", mine: false }
+      ];
+
+      const chatMessages = [
+        { id: 1, mine: false, text: "看到你也在曼谷夜市暴走局里，这周五你会去吗？" },
+        { id: 2, mine: true, text: "会去，我主要想吃本地小吃，顺便拍一点夜市照片。" },
+        { id: 3, mine: false, text: "那我们可以先在群里对一下路线，如果合适就一起走。" }
+      ];
+
+      const profileSections = {
+        tags: ["夜市觅食", "周末出走", "攻略控", "轻社交", "拍照党"],
+        visited: ["清迈周末夜市", "大阪新世界", "香港庙街"],
+        wishes: ["曼谷辉煌夜市", "首尔广藏市场", "台北宁夏夜市"],
+        posts: [
+          { id: 1, title: "曼谷夜市第一口应该吃什么", cover: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=300&auto=format&fit=crop" },
+          { id: 2, title: "不绕路的辉煌夜市暴走顺序", cover: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?q=80&w=300&auto=format&fit=crop" }
+        ]
+      };
+
+      const socialData = {
+        joinedGroups: [
+          { id: 1, name: "曼谷夜市暴走局", meta: "本周五 20:00 · 夜市觅食", count: "128/500", unread: 8 },
+          { id: 2, name: "阿尔卑斯星空露营局", meta: "下周六 · 露营 / 摄影", count: "64/500", unread: 2 }
+        ],
+        chats: [
+          { id: 1, name: "曼谷不睡觉", avatar: interestUsers[0].avatar, preview: "我已经把夜市集合点发群里了", time: "刚刚", unread: 2 },
+          { id: 2, name: "阿Ken在路上", avatar: interestUsers[1].avatar, preview: "你更想先吃还是先拍？", time: "12:18", unread: 0 },
+          { id: 3, name: "吃遍亚洲", avatar: interestUsers[2].avatar, preview: "我周五落地后直接去夜市", time: "昨天", unread: 0 }
+        ]
+      };
+
+      const mapFilters = ["夜市觅食", "周末短途", "攻略分享", "约伴中"];
+
+      const BottomNav = ({ navigate, active }) => (
+        <div className="absolute bottom-0 w-full h-[76px] bg-white border-t border-gray-100 flex justify-around items-center px-6 pb-4 z-[60]">
+          <button onClick={() => navigate('home')} className={`flex flex-col items-center ${active === 'home' ? 'text-orange-500' : 'text-gray-400 hover:text-gray-900'}`}><Compass className="w-6 h-6 mb-1" /><span className={`text-[10px] ${active === 'home' ? 'font-bold' : 'font-medium'}`}>探索</span></button>
+          <button onClick={() => navigate('social')} className={`flex flex-col items-center ${active === 'social' ? 'text-orange-500' : 'text-gray-400 hover:text-gray-900'}`}><MessageCircle className="w-6 h-6 mb-1" /><span className={`text-[10px] ${active === 'social' ? 'font-bold' : 'font-medium'}`}>社交</span></button>
+          <button onClick={() => navigate('planner')} className={`flex flex-col items-center ${active === 'planner' ? 'text-orange-500' : 'text-gray-400 hover:text-gray-900'}`}><MapIcon className="w-6 h-6 mb-1" /><span className={`text-[10px] ${active === 'planner' ? 'font-bold' : 'font-medium'}`}>规划</span></button>
+          <button onClick={() => navigate('profile')} className={`flex flex-col items-center ${active === 'profile' ? 'text-orange-500' : 'text-gray-400 hover:text-gray-900'}`}><User className="w-6 h-6 mb-1" /><span className={`text-[10px] ${active === 'profile' ? 'font-bold' : 'font-medium'}`}>我的</span></button>
+        </div>
+      );
+
+
+      // ================= 单个页面组件 =================
+
+      // 1. Onboarding 引导页
+      const ScreenOnboarding = ({ navigate }) => {
+        const [currentSlide, setCurrentSlide] = useState(0);
+        const [isLoaded, setIsLoaded] = useState(false);
+        const [isAnimatingTransition, setIsAnimatingTransition] = useState(false);
+
+        useEffect(() => { setIsLoaded(true); }, []);
+
+        const nextSlide = () => {
+          if (currentSlide < onboardingSlides.length - 1) setCurrentSlide(currentSlide + 1);
+          else startTransition();
+        };
+        const skipToLast = () => setCurrentSlide(onboardingSlides.length - 1);
+        const startTransition = () => {
+          setIsAnimatingTransition(true);
+          setTimeout(() => { navigate('home'); }, 2000);
+        };
+
+        return (
+          <div className="relative w-full h-full bg-black overflow-hidden font-sans">
+            <div className={`absolute inset-0 z-50 bg-[#020617] overflow-hidden transition-all duration-700 ease-in-out ${isAnimatingTransition ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
+              <div className="absolute top-12 w-full flex flex-col items-center justify-center z-30 opacity-90 animate-in fade-in duration-1000 delay-300">
+                <span className="text-white font-black text-4xl tracking-tighter drop-shadow-lg">gowow</span>
+                <span className="text-orange-400 text-xs font-bold tracking-widest mt-1 drop-shadow-md">去哇哦</span>
+              </div>
+              <div className="absolute top-[35%] left-0 w-full h-[2px] bg-white/20" style={{ animation: 'speed-line 1s linear infinite' }} />
+              <div className={`absolute w-[250%] aspect-square left-[-75%] top-[60%] rounded-full overflow-hidden ${isAnimatingTransition ? 'earth-surface' : ''}`} style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)', boxShadow: 'inset 0 30px 60px rgba(255,255,255,0.4), inset 0 -40px 80px rgba(0,0,0,0.8)' }}>
+                <svg viewBox="0 0 800 800" className="w-full h-full opacity-90 absolute inset-0 text-white">
+                  <path fill="currentColor" d="M100 200 C150 150, 250 180, 300 250 C350 320, 250 400, 200 380 C150 360, 50 250, 100 200 Z" />
+                  <path fill="currentColor" d="M500 150 C580 120, 650 200, 700 300 C750 400, 600 450, 550 350 C500 250, 420 180, 500 150 Z" />
+                </svg>
+                <div className="absolute inset-0 rounded-full shadow-[0_0_60px_30px_rgba(96,165,250,0.4)]"></div>
+              </div>
+              <div className="absolute bottom-[40%] left-0 w-full flex justify-center z-20 pointer-events-none">
+                 <div className={`w-[220px] h-[140px] ${isAnimatingTransition ? 'rv-container' : 'opacity-0'}`}>
+                    <div className={`w-full h-full relative drop-shadow-2xl ${isAnimatingTransition ? 'rv-body' : ''}`}>
+                      <svg viewBox="0 0 240 140" className="w-full h-full overflow-visible">
+                        <ellipse cx="120" cy="122" rx="85" ry="8" fill="rgba(0,0,0,0.3)" />
+                        <path d="M 30 110 L 30 30 C 30 15, 45 10, 60 10 L 140 10 C 160 10, 190 15, 205 30 C 215 40, 215 50, 205 55 L 180 55 L 195 85 C 200 95, 198 100, 188 105 C 180 110, 170 110, 160 110 Z" fill="#F8FAFC" />
+                        <path d="M 30 65 L 145 65 L 165 90 C 168 93, 188 95, 188 95 L 185 100 L 157 100 L 137 70 L 30 70 Z" fill="#0EA5E9"/>
+                        <path d="M 30 70 L 137 70 L 157 100 L 185 100 L 182 105 L 153 105 L 133 75 L 30 75 Z" fill="#EC4899"/>
+                        <path d="M 30 75 L 133 75 L 153 105 L 182 105 L 178 110 L 150 110 L 130 80 L 30 80 Z" fill="#F59E0B"/>
+                        <rect x="45" y="30" width="45" height="22" rx="4" fill="#0F172A" />
+                        <rect x="95" y="30" width="18" height="22" rx="4" fill="#0F172A" />
+                        <path d="M 160 22 L 185 22 C 195 22, 200 28, 190 35 L 155 35 Z" fill="#0F172A" />
+                        <path d="M 175 55 L 202 55 L 192 75 C 188 82, 180 85, 170 85 L 158 85 L 175 55 Z" fill="#0F172A" />
+                        <circle cx="57.5" cy="110" r="14" fill="#111827" />
+                        <circle cx="152.5" cy="110" r="14" fill="#111827" />
+                      </svg>
+                    </div>
+                 </div>
+              </div>
+              <h2 className="absolute bottom-[18%] w-full text-center text-xl font-bold tracking-widest text-white/90 animate-pulse z-30 drop-shadow-md">寻找灵魂的短暂栖息地...</h2>
+            </div>
+
+            <div className="absolute inset-0 transition-opacity duration-500 ease-in-out">
+              {onboardingSlides.map((slide, index) => (
+                <div key={slide.id} className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
+                  <img src={slide.image} className="absolute inset-0 w-full h-full object-cover" alt="slide" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/20" />
+                </div>
+              ))}
+            </div>
+
+            <div className="absolute top-0 w-full p-6 flex justify-between items-start z-20">
+              <div className="flex flex-col drop-shadow-md">
+                <span className="text-white font-black text-2xl tracking-tighter leading-none">gowow</span>
+                <span className="text-orange-400 text-[10px] font-bold tracking-widest ml-0.5 mt-1">去哇哦</span>
+              </div>
+              {currentSlide < onboardingSlides.length - 1 && (
+                <button onClick={skipToLast} className="bg-black/20 backdrop-blur-md text-white/90 px-4 py-1.5 rounded-full text-sm font-medium tracking-wider hover:bg-black/40 transition-colors border border-white/10">跳过</button>
+              )}
+            </div>
+
+            <div className="absolute inset-0 flex flex-col justify-end p-8 pb-12 z-30 pointer-events-none">
+              <div className={`transition-all duration-500 transform pointer-events-auto ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
+                <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20 shadow-2xl min-h-[220px]">
+                  {onboardingSlides[currentSlide].icon}
+                  <h1 className="text-2xl font-bold text-white mb-3 tracking-wide">{onboardingSlides[currentSlide].title}</h1>
+                  <p className="text-gray-200 text-sm leading-relaxed">{onboardingSlides[currentSlide].description}</p>
+                </div>
+                <div className="flex items-center justify-between mt-8 px-2">
+                  <div className="flex space-x-2">
+                    {onboardingSlides.map((_, index) => (
+                      <div key={index} className={`h-2 rounded-full transition-all duration-300 ${index === currentSlide ? 'w-8 bg-orange-500' : 'w-2 bg-white/30'}`} />
+                    ))}
+                  </div>
+                  <button onClick={nextSlide} className="group flex items-center justify-center w-16 h-16 bg-orange-500 text-white rounded-full shadow-[0_0_20px_rgba(249,115,22,0.4)] active:scale-95">
+                    {currentSlide === onboardingSlides.length - 1 ? <span className="font-bold text-sm tracking-widest pl-1">启程</span> : <ArrowRight className="w-6 h-6" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // 2. Home Feed 探索首页
+      const ScreenHomeFeed = ({ navigate }) => {
+        const [isSearching, setIsSearching] = useState(false);
+        const [cards, setCards] = useState(feedCards);
+        const [currentIndex, setCurrentIndex] = useState(0);
+        const [viewMode, setViewMode] = useState('feed');
+        const [fullScreenMedia, setFullScreenMedia] = useState(null);
+        const [exitDirection, setExitDirection] = useState(null);
+        const activeCard = cards[currentIndex] || feedCards[0];
+
+        const handleSearch = () => {
+          setIsSearching(true); setCards([]); setViewMode('feed');
+          setTimeout(() => { setIsSearching(false); setCards(feedCards); setCurrentIndex(0); }, 1500);
+        };
+
+        const handleSwipeAction = (actionType) => {
+          if (exitDirection || currentIndex >= cards.length) return;
+          setExitDirection(actionType);
+          setTimeout(() => { setCurrentIndex(prev => prev + 1); setExitDirection(null); }, 350);
+        };
+
+        const renderScoreBars = (scores) => (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-2.5">
+            {Object.entries(scores).map(([dimension, score]) => (
+              <div key={dimension} className="flex items-center text-[10px]">
+                <span className="w-8 text-gray-500">{dimension}</span>
+                <div className="flex-1 h-1 bg-gray-200 rounded-full mx-1.5 overflow-hidden">
+                  <div className={`h-full rounded-full ${score >= 4 ? 'bg-orange-500' : score >= 2.5 ? 'bg-yellow-400' : 'bg-red-400'}`} style={{ width: `${(score / 5) * 100}%` }}></div>
+                </div>
+                <span className="w-4 text-right font-bold text-gray-800">{score.toFixed(1)}</span>
+              </div>
+            ))}
+          </div>
+        );
+
+        return (
+          <div className="relative w-full h-full bg-[#F3F4F6] overflow-hidden flex flex-col font-sans">
+            <div className="relative z-20 pt-12 pb-2 px-5 bg-white shadow-sm">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-col">
+                  <span className="text-gray-900 font-black text-2xl tracking-tighter leading-none">gowow</span>
+                  <span className="text-orange-500 text-[9px] font-bold tracking-widest ml-0.5 mt-0.5">去哇哦</span>
+                </div>
+                <div className="bg-gray-100 p-1 rounded-full flex items-center">
+                  <button onClick={() => setViewMode('feed')} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${viewMode === 'feed' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>推荐流</button>
+                  <button onClick={() => setViewMode('map')} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1 ${viewMode === 'map' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-400'}`}><MapIcon className="w-3 h-3" />地图</button>
+                </div>
+              </div>
+              <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full p-1 shadow-sm focus-within:ring-2 ring-orange-500/50">
+                <input type="text" placeholder="搜索城市、地点、玩法" className="flex-1 bg-transparent border-none outline-none text-gray-800 text-sm px-4 placeholder-gray-400" onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+                <button onClick={handleSearch} className="p-2 bg-orange-500 rounded-full text-white"><Search className="w-4 h-4" /></button>
+              </div>
+            </div>
+
+            {isSearching && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/95 backdrop-blur-md z-40">
+                <div className="loader-container">
+                  <div className="loader-moon"><div className="loader-crater loader-crater1"></div><div className="loader-crater loader-crater2"></div><div className="loader-crater loader-crater3"></div></div>
+                  <div className="loader-orbit"><div className="loader-rv-wrapper"><div className="loader-fire"></div></div></div>
+                </div>
+                <h2 className="mt-6 text-lg font-bold tracking-widest text-orange-400 animate-pulse">寻找灵魂的短暂栖息地...</h2>
+              </div>
+            )}
+
+            <div className={`flex-1 relative z-10 w-full flex flex-col items-center justify-start pt-3 pb-24 transition-opacity duration-500 ${viewMode === 'map' ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100'}`}>
+              {cards.length > 0 && currentIndex < cards.length ? (
+                <>
+                  <div className="relative w-[92%] flex-1 min-h-0 perspective-1000">
+                    {cards.map((card, index) => {
+                      if (index < currentIndex) return null;
+                      const isTop = index === currentIndex;
+                      const isNext = index === currentIndex + 1;
+                      if (!isTop && !isNext) return null;
+
+                      let swipeTransform = isTop ? 'translate(0, 0) scale(1) rotateX(0deg) rotateY(0deg)' : 'translate(0, 24px) scale(0.92) rotateX(5deg)';
+                      let swipeOpacity = isTop ? 1 : 0.6;
+                      if (isTop && exitDirection) {
+                        swipeOpacity = 0;
+                        if (exitDirection === 'left') swipeTransform = 'translate(-120%, 10%) rotateZ(-15deg) rotateY(-30deg) scale(0.9)';
+                        if (exitDirection === 'right') swipeTransform = 'translate(120%, 10%) rotateZ(15deg) rotateY(30deg) scale(0.9)';
+                        if (exitDirection === 'up') swipeTransform = 'translate(0, -120%) rotateX(30deg) scale(0.8)';
+                      }
+
+                      return (
+                        <div key={card.id} className="absolute inset-0 w-full bg-white rounded-[24px] shadow-xl overflow-hidden flex flex-col transition-all duration-300 ease-out origin-bottom" style={{ transform: swipeTransform, opacity: swipeOpacity, zIndex: isTop ? 20 : 10 }}>
+                          <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-black/40 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/20 cursor-pointer" onClick={() => navigate('interest')}>
+                            <img src={card.author.avatar} className="w-6 h-6 rounded-full border border-white" alt="author" />
+                            <span className="text-white text-xs font-bold">{card.author.name}</span>
+                          </div>
+                          <div className="relative h-[260px] bg-gray-900 w-full flex overflow-x-auto snap-x snap-mandatory scrollbar-hide">
+                            {card.videos.map((vid, vIdx) => {
+                              const posterUrl = card.videos.find(url => url.includes('.jpg') || url.includes('.jpeg'));
+                              return (
+                                <div key={vIdx} className="relative w-full h-full flex-shrink-0 snap-center cursor-pointer group" onClick={() => setFullScreenMedia({ ...card, currentMediaIndex: vIdx })}>
+                                  {vid.includes('.mp4') ? (
+                                    <video src={vid} poster={posterUrl} autoPlay loop muted playsInline onCanPlay={(e) => e.target.play()} className="w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105 pointer-events-none" />
+                                  ) : (
+                                    <img src={vid} className="w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105" alt="Travel capture" />
+                                  )}
+                                  <div className="absolute inset-0 flex justify-center items-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    <PlayCircle className="w-12 h-12 text-white/90 drop-shadow-md" strokeWidth={1.5} />
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <div className="flex-1 p-5 pb-4 flex flex-col bg-white overflow-y-auto">
+                            <div className="flex justify-between items-start mb-1.5 gap-3">
+                              <div>
+                                <h2 className="text-xl font-black text-gray-900 leading-tight tracking-tight">{card.name}</h2>
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  <span className="px-2 py-1 rounded-full bg-orange-50 text-orange-600 text-[10px] font-bold">玩法体验</span>
+                                  <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold">攻略分享</span>
+                                </div>
+                              </div>
+                              <button onClick={() => navigate('detail')} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 active:scale-90 transition-colors shrink-0"><Info className="w-4 h-4 text-gray-600" /></button>
+                            </div>
+                            <div className="flex items-center text-gray-500 text-[11px] mb-3 font-medium">
+                              <MapPin className="w-3 h-3 mr-1 text-orange-500" /><span>{card.location}</span><span className="mx-2 text-gray-300">|</span><span>距您 {card.distance}</span>
+                            </div>
+                            <p className="text-[13px] text-gray-800 leading-relaxed mb-3 line-clamp-3"><span className="text-orange-500 font-bold mr-1">“</span>{card.postText}<span className="text-orange-500 font-bold ml-1">”</span></p>
+                            <div className="bg-gradient-to-br from-indigo-50 to-blue-50/50 p-2.5 rounded-xl border border-blue-100 relative shadow-sm">
+                              <div className="flex items-center gap-1 mb-1"><Sparkles className="w-3.5 h-3.5 text-blue-600" /><span className="text-blue-700 text-[10px] font-black uppercase tracking-wider">gowow AI 真实提炼</span></div>
+                              <p className="text-[11px] text-blue-900/80 leading-relaxed font-medium line-clamp-2">{card.aiIntro}</p>
+                            </div>
+                            {renderScoreBars(card.scores)}
+                            <div className="grid grid-cols-2 gap-2 mt-4">
+                              <button onClick={() => navigate('interest')} className="py-2.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold">同兴趣的人</button>
+                              <button onClick={() => navigate('group')} className="py-2.5 rounded-xl bg-orange-500 text-white text-xs font-bold">去群里看看</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="relative z-20 flex justify-center items-center gap-6 mt-4 mb-2 flex-shrink-0">
+                    <button onClick={() => handleSwipeAction('left')} className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-100 text-gray-400 hover:text-gray-900 active:scale-90"><X className="w-6 h-6" strokeWidth={2.5} /></button>
+                    <button onClick={() => handleSwipeAction('up')} className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md border border-gray-100 text-blue-500 active:scale-90"><Bookmark className="w-5 h-5" /></button>
+                    <button onClick={() => handleSwipeAction('right')} className="w-16 h-16 bg-gradient-to-tr from-orange-500 to-red-500 rounded-full flex items-center justify-center shadow-lg text-white active:scale-90"><Heart className="w-7 h-7 fill-white" /></button>
+                  </div>
+                </>
+              ) : !isSearching && (
+                <div className="flex flex-col items-center justify-center h-full text-center px-8 z-20 pb-20">
+                  <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-4"><Compass className="w-10 h-10 text-gray-400" /></div>
+                  <h3 className="text-gray-900 text-xl font-bold mb-2">今日推荐已阅尽</h3>
+                  <button onClick={() => setCards(feedCards)} className="px-8 py-3.5 mt-6 bg-gray-900 text-white font-bold rounded-full hover:bg-black">重新探索全球</button>
+                </div>
+              )}
+            </div>
+
+            <div className={`absolute inset-x-0 top-[126px] bottom-[76px] px-4 pb-4 transition-opacity duration-500 ${viewMode === 'map' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className="h-full rounded-[28px] overflow-hidden shadow-xl bg-[radial-gradient(circle_at_top,#0f172a_0%,#111827_38%,#030712_100%)] relative flex flex-col items-center justify-between px-4 pt-6 pb-4">
+                <div className="w-full flex gap-2 overflow-x-auto scrollbar-hide z-10">
+                  {mapFilters.map(label => <span key={label} className="px-3 py-1.5 rounded-full bg-white/10 text-white text-xs font-bold whitespace-nowrap backdrop-blur-md border border-white/10">{label}</span>)}
+                </div>
+                <div className="relative flex-1 w-full flex items-center justify-center">
+                  <div className="globe-orbit-card absolute top-10 left-3 bg-white/10 backdrop-blur-xl text-white px-3 py-2 rounded-2xl border border-white/10 text-left max-w-[132px]">
+                    <p className="text-[10px] text-white/60 font-bold">热门目的地</p>
+                    <p className="text-sm font-black mt-1">曼谷辉煌夜市</p>
+                    <p className="text-[11px] text-white/70 mt-1">夜市觅食 · 攻略分享</p>
+                  </div>
+                  <div className="globe-orbit-card absolute bottom-12 right-3 bg-white/10 backdrop-blur-xl text-white px-3 py-2 rounded-2xl border border-white/10 text-left max-w-[138px]" style={{ animationDelay: '1.8s' }}>
+                    <p className="text-[10px] text-white/60 font-bold">本周约伴</p>
+                    <p className="text-sm font-black mt-1">{mainGroupData.name}</p>
+                    <p className="text-[11px] text-white/70 mt-1">{mainGroupData.members}/{mainGroupData.limit} 已加入</p>
+                  </div>
+                  <div className="globe-shell">
+                    <div className="globe-surface"></div>
+                    <div className="globe-continents">
+                      <svg viewBox="0 0 300 300" className="w-full h-full opacity-90">
+                        <path fill="rgba(125,211,252,0.45)" d="M70 100 C88 78, 120 74, 145 92 C165 106, 168 138, 150 157 C132 177, 98 177, 75 159 C55 144, 54 120, 70 100 Z" />
+                        <path fill="rgba(34,197,94,0.35)" d="M182 82 C210 70, 244 85, 258 110 C272 136, 266 174, 236 189 C205 204, 166 190, 153 160 C141 134, 151 95, 182 82 Z" />
+                        <path fill="rgba(250,204,21,0.26)" d="M132 190 C152 177, 182 180, 197 197 C213 214, 211 240, 191 253 C173 265, 145 265, 127 252 C109 239, 112 205, 132 190 Z" />
+                      </svg>
+                    </div>
+                    <button onClick={() => navigate('detail')} className="globe-marker absolute" style={{ top: '28%', left: '66%' }}></button>
+                    <button onClick={() => navigate('detail')} className="globe-marker absolute" style={{ top: '44%', left: '23%' }}></button>
+                    <button onClick={() => navigate('detail')} className="globe-marker absolute" style={{ top: '67%', left: '55%' }}></button>
+                  </div>
+                </div>
+                <div className="w-full bg-white/10 backdrop-blur-2xl rounded-[24px] p-4 border border-white/10 text-white shadow-2xl">
+                  <div className="flex gap-3 items-center">
+                    <img src={activeCard.videos.find(url => !url.includes('.mp4'))} className="w-20 h-20 rounded-2xl object-cover" alt="map-card" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-black truncate">{activeCard.name}</h3>
+                        <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-orange-500/20 text-orange-300">可加入</span>
+                      </div>
+                      <p className="text-[11px] text-white/70 mt-1">{activeCard.location}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <span className="px-2 py-1 rounded-full bg-white/10 text-[10px] font-bold">{mainGroupData.schedule}</span>
+                        <span className="px-2 py-1 rounded-full bg-white/10 text-[10px] font-bold">夜市觅食</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-3">
+                        <p className="text-[11px] text-white/70">主群组 {mainGroupData.members}/{mainGroupData.limit}</p>
+                        <button onClick={() => navigate('group')} className="px-4 py-2 rounded-full bg-white text-gray-900 text-[11px] font-black">进入群组</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {fullScreenMedia && (
+              <div className="absolute inset-0 z-[100] bg-black animate-in slide-in-from-bottom-full duration-300">
+                {fullScreenMedia.videos[fullScreenMedia.currentMediaIndex || 0].includes('.mp4') ? (
+                  <video src={fullScreenMedia.videos[fullScreenMedia.currentMediaIndex || 0]} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                ) : (
+                   <img src={fullScreenMedia.videos[fullScreenMedia.currentMediaIndex || 0]} className="w-full h-full object-cover" alt="fs" />
+                )}
+                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-black/60 to-transparent p-5 pt-12">
+                  <button onClick={() => setFullScreenMedia(null)} className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"><ArrowLeft className="w-6 h-6" /></button>
+                </div>
+                <div className="absolute bottom-0 left-0 w-full p-5 pb-10 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-0">
+                  <h2 className="text-white text-xl font-bold mb-2">{fullScreenMedia.name}</h2>
+                  <p className="text-white/90 text-sm line-clamp-2">{fullScreenMedia.postText}</p>
+                </div>
+              </div>
+            )}
+
+            <BottomNav navigate={navigate} active="home" />
+          </div>
+        );
+      };
+
+      // 3. Place Detail 地点详情页
+      const ScreenPlaceDetail = ({ navigate, goBack }) => {
+        const ReadOnlyStarRating = ({ dimension, score }) => (
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-gray-600 w-12">{dimension}</span>
+            <div className="flex gap-1 flex-1 px-3">
+              {[1, 2, 3, 4, 5].map((val) => {
+                let fill = 0; if (score >= val) fill = 100; else if (score >= val - 0.5 && score < val) fill = 50; else if (score > val - 1) fill = (score - (val - 1)) * 100;
+                return <div key={val} className="relative w-4 h-4"><Star className="absolute top-0 left-0 w-4 h-4 text-gray-200 fill-gray-200" /><div className="absolute top-0 left-0 overflow-hidden h-full" style={{ width: `${fill}%` }}><Star className="w-4 h-4 text-orange-500 fill-current" /></div></div>;
+              })}
+            </div>
+            <span className="text-sm font-black text-orange-500">{score.toFixed(1)}</span>
+          </div>
+        );
+
+        return (
+          <div className="relative w-full h-full bg-gray-50 flex flex-col font-sans overflow-hidden">
+            <div className="absolute top-0 w-full px-4 pt-12 pb-3 flex items-center justify-between z-30 bg-gradient-to-b from-black/60 to-transparent">
+              <button onClick={goBack} className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"><ChevronLeft className="w-6 h-6" /></button>
+              <button onClick={() => navigate('interest')} className="px-3 py-2 bg-black/20 backdrop-blur-md rounded-full text-white text-xs font-bold">同兴趣的人</button>
+            </div>
+            <div className="flex-1 overflow-y-auto pb-40 scrollbar-hide">
+              <div className="w-full h-72 bg-gray-900"><img src={placeDetailData.images[0]} className="w-full h-full object-cover opacity-90" alt="place" /></div>
+              <div className="bg-white p-5 rounded-b-3xl shadow-sm mb-2 relative z-10 -mt-4">
+                <div className="flex items-center gap-2 mb-2"><span className="text-[10px] font-bold px-2 py-0.5 rounded-md border border-orange-200 text-orange-600 bg-orange-50">{placeDetailData.type}</span></div>
+                <h1 className="text-2xl font-black text-gray-900 leading-tight mb-3">{placeDetailData.name}</h1>
+                <div className="flex items-start gap-2 text-gray-500 text-xs mb-2 font-medium"><MapPin className="w-4 h-4 text-orange-500" /><span>{placeDetailData.location}</span></div>
+                <div className="mt-4 bg-gradient-to-br from-indigo-50 to-blue-50/50 p-3.5 rounded-2xl border border-blue-100 shadow-sm">
+                  <div className="flex items-center gap-1 mb-1.5"><Sparkles className="w-4 h-4 text-blue-600" /><span className="text-blue-700 text-xs font-black uppercase tracking-wider">gowow AI 真实提炼</span></div>
+                  <p className="text-xs text-blue-900/80 leading-relaxed font-medium">{placeDetailData.aiIntro}</p>
+                </div>
+              </div>
+              <div className="bg-white p-5 mb-2 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-black text-gray-900">主群组</h2>
+                  <button onClick={() => navigate('group')} className="text-orange-500 text-xs font-black flex items-center gap-1">去群里看看 <ChevronRight className="w-3 h-3" /></button>
+                </div>
+                <div className="rounded-3xl bg-gradient-to-br from-gray-900 to-gray-800 p-4 text-white shadow-xl">
+                  <div className="flex justify-between items-start gap-3">
+                    <div>
+                      <p className="text-lg font-black">{mainGroupData.name}</p>
+                      <p className="text-xs text-white/70 mt-1">{mainGroupData.city} · {mainGroupData.place}</p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-white/10 text-[10px] font-bold">{mainGroupData.members}/{mainGroupData.limit}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <span className="px-2.5 py-1 rounded-full bg-white/10 text-[10px] font-bold">{mainGroupData.schedule}</span>
+                    <span className="px-2.5 py-1 rounded-full bg-white/10 text-[10px] font-bold">{mainGroupData.mode}</span>
+                  </div>
+                  <div className="mt-3 p-3 rounded-2xl bg-white/10 border border-white/10">
+                    <p className="text-[11px] text-white/70 mb-1">加入门槛</p>
+                    <p className="text-sm font-bold">{mainGroupData.gate}</p>
+                  </div>
+                  <p className="mt-3 text-[12px] text-white/80 leading-relaxed">公告：{mainGroupData.announcement}</p>
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <button onClick={() => navigate('group')} className="py-3 rounded-2xl bg-white/15 text-white font-bold text-sm border border-white/15">申请加入</button>
+                    <button onClick={() => navigate('group')} className="py-3 rounded-2xl bg-orange-500 text-white font-bold text-sm">直接加入</button>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white p-5 mb-2 shadow-sm">
+                <h2 className="text-lg font-black text-gray-900 mb-4">多维真实评价</h2>
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  {Object.entries(placeDetailData.scores).map(([dim, score]) => <ReadOnlyStarRating key={dim} dimension={dim} score={score} />)}
+                </div>
+              </div>
+              <div className="bg-white p-5 mb-2 shadow-sm">
+                <h2 className="text-lg font-black text-gray-900 mb-5">无滤镜游记 (342)</h2>
+                <div className="space-y-6">
+                  {placeDetailData.reviews.map(review => (
+                    <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('profile')}>
+                          <img src={review.user.avatar} className="w-8 h-8 rounded-full object-cover" alt="avatar" />
+                          <div><p className="text-sm font-bold text-gray-900">{review.user.name}</p><p className="text-[10px] text-gray-400">{review.date}</p></div>
+                        </div>
+                        <button onClick={() => navigate('chat')} className="text-[10px] font-bold text-orange-500">发私聊</button>
+                      </div>
+                      <p className="text-sm text-gray-800 leading-relaxed mb-3">{review.content}</p>
+                      {review.images.length > 0 && <img src={review.images[0]} className="w-24 h-24 rounded-xl object-cover" alt="rev" />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 w-full bg-white/95 backdrop-blur-xl border-t border-gray-200 p-4 pb-8 z-30 space-y-2">
+              <div className="grid grid-cols-4 gap-2">
+                <button onClick={() => navigate('review')} className="rounded-2xl py-3 bg-orange-50 text-orange-600 text-xs font-bold border border-orange-200">评价</button>
+                <button className="rounded-2xl py-3 bg-gray-900 text-white text-xs font-bold">导航</button>
+                <button onClick={() => navigate('review')} className="rounded-2xl py-3 bg-gray-100 text-gray-700 text-xs font-bold">发起群组</button>
+                <button onClick={() => navigate('group')} className="rounded-2xl py-3 bg-orange-500 text-white text-xs font-bold">加入群组</button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // 4. Interest Users 同兴趣用户页
+      const ScreenInterestUsers = ({ navigate, goBack }) => (
+        <div className="relative w-full h-full bg-gray-50 flex flex-col font-sans overflow-hidden">
+          <div className="bg-white px-4 pt-12 pb-4 sticky top-0 z-20 shadow-sm">
+            <div className="flex items-center justify-between">
+              <button onClick={goBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronLeft className="w-6 h-6" /></button>
+              <h1 className="text-lg font-bold text-gray-900">同兴趣的人</h1>
+              <div className="w-10"></div>
+            </div>
+            <div className="mt-4 bg-gradient-to-r from-orange-500 to-pink-500 rounded-3xl p-4 text-white shadow-lg">
+              <p className="text-[11px] font-bold text-white/80">这些人也对该地点感兴趣</p>
+              <p className="text-lg font-black mt-1">{mainGroupData.place}</p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <span className="px-2 py-1 rounded-full bg-white/15 text-[10px] font-bold">{mainGroupData.schedule}</span>
+                <span className="px-2 py-1 rounded-full bg-white/15 text-[10px] font-bold">夜市觅食</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4 pb-24 space-y-3 scrollbar-hide">
+            {interestUsers.map(user => (
+              <div key={user.id} className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-start gap-3">
+                  <img src={user.avatar} className="w-14 h-14 rounded-2xl object-cover" alt={user.name} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-gray-900">{user.name}</p>
+                        <p className="text-[10px] text-gray-400 mt-1">{user.lastSeen}</p>
+                      </div>
+                      <button onClick={() => navigate('group')} className="text-[10px] font-bold px-3 py-1.5 rounded-full bg-orange-50 text-orange-600">去群里看看</button>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2 leading-relaxed">{user.bio}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {user.tags.map(tag => <span key={tag} className="px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-[10px] font-bold">{tag}</span>)}
+                    </div>
+                    <div className="mt-3 p-3 rounded-2xl bg-gray-50 border border-gray-100">
+                      <p className="text-[10px] text-gray-400">共同兴趣</p>
+                      <p className="text-xs text-gray-700 font-bold mt-1">{user.common}</p>
+                    </div>
+                    <button onClick={() => navigate('profile')} className="w-full mt-3 py-2.5 rounded-2xl bg-gray-900 text-white text-xs font-bold">查看主页</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      // 5. Social Hub 社交页
+      const ScreenSocial = ({ navigate }) => {
+        const [recommendationIndex, setRecommendationIndex] = useState(0);
+        const [exitDirection, setExitDirection] = useState(null);
+        const recommendationUsers = interestUsers;
+
+        const nextRecommendation = (direction) => {
+          if (exitDirection) return;
+          setExitDirection(direction);
+          setTimeout(() => {
+            setRecommendationIndex(prev => prev >= recommendationUsers.length - 1 ? 0 : prev + 1);
+            setExitDirection(null);
+          }, 260);
+        };
+
+        const currentUser = recommendationUsers[recommendationIndex] || recommendationUsers[0];
+        const nextUser = recommendationUsers[(recommendationIndex + 1) % recommendationUsers.length];
+        const recommendationProgress = `${recommendationIndex + 1}/${recommendationUsers.length}`;
+        const activeTransform = exitDirection === 'skip'
+          ? 'translate(-115%, 8%) rotate(-14deg)'
+          : exitDirection === 'like'
+            ? 'translate(115%, 8%) rotate(14deg)'
+            : 'translate(0, 0) rotate(0deg)';
+
+        return (
+          <div className="relative w-full h-full bg-[#F3F4F6] flex flex-col font-sans overflow-hidden">
+            <div className="bg-white px-5 pt-12 pb-3 shadow-sm z-20">
+              <div>
+                <h1 className="text-2xl font-black text-gray-900">社交</h1>
+                <p className="text-sm text-gray-500 mt-1">算法优先帮你匹配高契合用户，再继续私聊和进群</p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3 pb-24 space-y-3 scrollbar-hide">
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h2 className="text-base font-black text-gray-900">推荐用户</h2>
+                    <p className="text-[11px] text-gray-500 mt-1">基于共同地点、玩法和旅行风格推荐</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-bold text-gray-400">{recommendationProgress}</span>
+                    <button onClick={() => navigate('interest')} className="text-orange-500 text-[11px] font-bold">查看更多</button>
+                  </div>
+                </div>
+                <div className="relative h-[208px] mt-2 overflow-hidden">
+                  <div className="absolute inset-x-6 top-4 bottom-0 rounded-[28px] bg-gradient-to-b from-gray-200 to-gray-100 scale-[0.95] opacity-70"></div>
+                  <div className="absolute inset-x-3 top-2 bottom-0 rounded-[28px] overflow-hidden bg-white shadow-lg border border-gray-100 scale-[0.98] opacity-90 p-4">
+                    <div className="flex items-center gap-3">
+                      <img src={nextUser.avatar} className="w-14 h-14 rounded-2xl object-cover" alt={nextUser.name} />
+                      <div className="min-w-0">
+                        <h3 className="text-base font-black text-gray-900 truncate">{nextUser.name}</h3>
+                        <p className="text-[10px] text-gray-400 mt-1">下一位高契合推荐</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 rounded-[28px] overflow-hidden bg-white shadow-xl border border-gray-100 transition-all duration-300 ease-out p-4" style={{ transform: activeTransform, opacity: exitDirection ? 0 : 1 }}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img src={currentUser.avatar} className="w-16 h-16 rounded-[20px] object-cover" alt={currentUser.name} />
+                      <div className="min-w-0">
+                        <h3 className="text-xl font-black text-gray-900 truncate">{currentUser.name}</h3>
+                        <p className="text-[11px] text-gray-500 mt-1">{currentUser.lastSeen}</p>
+                      </div>
+                    </div>
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {currentUser.tags.map(tag => <span key={tag} className="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-[10px] font-bold">{tag}</span>)}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <span className="px-2.5 py-1.5 rounded-full bg-orange-50 text-orange-700 text-[10px] font-bold border border-orange-100">{currentUser.common}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-3">
+                        <button onClick={() => nextRecommendation('skip')} className="py-2.5 rounded-2xl bg-gray-100 text-gray-600 text-xs font-black">跳过</button>
+                        <button onClick={() => navigate('chat')} className="py-2.5 rounded-2xl bg-gray-900 text-white text-xs font-black">去私聊</button>
+                        <button onClick={() => nextRecommendation('like')} className="py-2.5 rounded-2xl bg-orange-500 text-white text-xs font-black">喜欢</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-base font-black text-gray-900">最近私聊</h2>
+                  <button onClick={() => navigate('chat')} className="text-orange-500 text-[11px] font-bold">全部消息</button>
+                </div>
+                <div className="space-y-1.5">
+                  {socialData.chats.slice(0, 2).map(chat => (
+                    <button key={chat.id} onClick={() => navigate('chat')} className="w-full flex items-center gap-3 rounded-2xl px-2 py-1.5 text-left hover:bg-gray-50">
+                      <img src={chat.avatar} className="w-12 h-12 rounded-2xl object-cover" alt={chat.name} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-black text-gray-900 truncate">{chat.name}</p>
+                          <span className="text-[10px] text-gray-400">{chat.time}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 truncate mt-1">{chat.preview}</p>
+                      </div>
+                      {chat.unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-orange-500 text-white text-[10px] font-black flex items-center justify-center">{chat.unread}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-base font-black text-gray-900">我加入的群组</h2>
+                  <button onClick={() => navigate('group')} className="text-orange-500 text-[11px] font-bold">查看更多</button>
+                </div>
+                <div className="space-y-2.5">
+                  {socialData.joinedGroups.slice(0, 1).map(group => (
+                    <button key={group.id} onClick={() => navigate('group')} className="w-full text-left rounded-2xl bg-gray-50 border border-gray-100 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-gray-900">{group.name}</p>
+                          <p className="text-xs text-gray-500 mt-1">{group.meta}</p>
+                        </div>
+                        {group.unread > 0 && <span className="min-w-6 h-6 px-2 rounded-full bg-orange-500 text-white text-[10px] font-black flex items-center justify-center">{group.unread}</span>}
+                      </div>
+                      <div className="flex items-center justify-between mt-3">
+                        <p className="text-[11px] text-gray-400">成员 {group.count}</p>
+                        <span className="text-[11px] font-bold text-orange-500">进入群组</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <BottomNav navigate={navigate} active="social" />
+          </div>
+        );
+      };
+
+      // 6. Write Review 发布内容/发起群组
+      const ScreenWriteReview = ({ navigate, goBack }) => {
+        const [createGroup, setCreateGroup] = useState(true);
+
+        return (
+          <div className="relative w-full h-full bg-gray-50 flex flex-col font-sans overflow-hidden">
+            <div className="bg-white px-4 pt-12 pb-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+              <button onClick={goBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronLeft className="w-6 h-6" /></button>
+              <h1 className="text-lg font-bold text-gray-900">发布内容</h1>
+              <div className="w-10"></div>
+            </div>
+            <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide p-4 space-y-3">
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <label className="text-xs text-gray-400 font-bold">地点</label>
+                <div className="mt-2 flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3">
+                  <span className="text-sm font-bold text-gray-900">曼谷辉煌夜市</span>
+                  <MapPin className="w-4 h-4 text-orange-500" />
+                </div>
+              </div>
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 font-bold">时间</label>
+                  <div className="mt-2 bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold text-gray-900">本周五 20:00</div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-bold">玩法</label>
+                  <div className="mt-2 bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold text-gray-900">夜市觅食</div>
+                </div>
+              </div>
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <label className="text-xs text-gray-400 font-bold">正文</label>
+                <textarea placeholder="分享你的玩法、攻略、踩点建议，或者说明你想找什么样的同行人..." className="w-full mt-3 h-28 outline-none resize-none text-sm text-gray-800"></textarea>
+                <div className="flex gap-3 mt-2"><button className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center text-gray-400 bg-gray-50"><ImagePlus className="w-5 h-5 mb-1" /><span className="text-[9px]">添加实拍</span></button></div>
+              </div>
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-gray-900">同时发起群组</p>
+                    <p className="text-xs text-gray-500 mt-1">把这条内容直接变成一个地点+时间/玩法的约伴入口</p>
+                  </div>
+                  <button onClick={() => setCreateGroup(!createGroup)} className={`w-14 h-8 rounded-full p-1 transition-all ${createGroup ? 'bg-orange-500' : 'bg-gray-200'}`}><div className={`w-6 h-6 rounded-full bg-white transition-all ${createGroup ? 'translate-x-6' : 'translate-x-0'}`}></div></button>
+                </div>
+                {createGroup && (
+                  <div className="mt-4 grid gap-3">
+                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
+                      <p className="text-[10px] text-gray-400 font-bold">群名称</p>
+                      <p className="text-sm font-bold text-gray-900 mt-1">曼谷夜市暴走局</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
+                      <p className="text-[10px] text-gray-400 font-bold">加入门槛</p>
+                      <p className="text-sm font-bold text-gray-900 mt-1">喜欢该地点即可加入</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="absolute bottom-0 w-full bg-white border-t border-gray-100 p-4 pb-8 z-30">
+              <button onClick={() => navigate('group')} className="w-full bg-gray-900 text-white rounded-full py-3.5 font-bold flex items-center justify-center gap-2 active:scale-95 shadow-xl"><Send className="w-4 h-4" /><span>{createGroup ? '发布并发起群组' : '发布内容'}</span></button>
+            </div>
+          </div>
+        );
+      };
+
+      // 6. Group 群组页
+      const ScreenGroup = ({ navigate, goBack }) => (
+        <div className="relative w-full h-full bg-gray-50 flex flex-col font-sans overflow-hidden">
+          <div className="bg-white px-4 pt-12 pb-4 sticky top-0 z-20 shadow-sm">
+            <div className="flex items-center justify-between">
+              <button onClick={goBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronLeft className="w-6 h-6" /></button>
+              <h1 className="text-lg font-bold text-gray-900">{mainGroupData.name}</h1>
+              <button onClick={() => navigate('profile')} className="text-orange-500 text-xs font-black">群主主页</button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide">
+            <div className="mx-4 mt-4 rounded-[28px] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-5 shadow-xl">
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <p className="text-xl font-black">{mainGroupData.name}</p>
+                  <p className="text-xs text-white/70 mt-2">{mainGroupData.city} · {mainGroupData.place}</p>
+                </div>
+                <span className="px-3 py-1.5 rounded-full bg-white/10 text-[11px] font-bold">{mainGroupData.members}/{mainGroupData.limit}</span>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <span className="px-2.5 py-1 rounded-full bg-white/10 text-[10px] font-bold">{mainGroupData.schedule}</span>
+                <span className="px-2.5 py-1 rounded-full bg-white/10 text-[10px] font-bold">{mainGroupData.mode}</span>
+              </div>
+              <div className="mt-4 bg-white/10 rounded-2xl p-3 border border-white/10">
+                <p className="text-[10px] text-white/60 font-bold uppercase">群公告</p>
+                <p className="text-sm font-medium leading-relaxed mt-2">{mainGroupData.announcement}</p>
+              </div>
+              <div className="mt-3 bg-white/10 rounded-2xl p-3 border border-white/10">
+                <p className="text-[10px] text-white/60 font-bold uppercase">群置顶</p>
+                <p className="text-sm font-medium leading-relaxed mt-2">{mainGroupData.pinned}</p>
+              </div>
+            </div>
+            <div className="bg-white mx-4 mt-4 rounded-3xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-black text-gray-900">成员预览</h2>
+                <button onClick={() => navigate('interest')} className="text-orange-500 text-[11px] font-bold">查看更多</button>
+              </div>
+              <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+                {interestUsers.map(user => (
+                  <button key={user.id} onClick={() => navigate('profile')} className="min-w-[78px] flex flex-col items-center text-center">
+                    <img src={user.avatar} className="w-14 h-14 rounded-2xl object-cover" alt={user.name} />
+                    <span className="text-[10px] font-bold text-gray-700 mt-2 line-clamp-1">{user.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white mx-4 my-4 rounded-3xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-black text-gray-900">群留言</h2>
+                <button onClick={() => navigate('chat')} className="text-orange-500 text-[11px] font-bold">发起私聊</button>
+              </div>
+              <div className="space-y-3">
+                {groupMessages.map(msg => (
+                  <div key={msg.id} className={`flex ${msg.mine ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[82%] rounded-2xl px-3 py-2.5 ${msg.mine ? 'bg-orange-500 text-white rounded-br-md' : 'bg-gray-100 text-gray-800 rounded-bl-md'}`}>
+                      {!msg.mine && <p className="text-[10px] font-bold mb-1 text-gray-500">{msg.user}</p>}
+                      <p className="text-sm leading-relaxed">{msg.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="absolute bottom-0 w-full bg-white border-t border-gray-100 p-4 pb-8 z-30 flex gap-3">
+            <div className="flex-1 bg-gray-50 rounded-full px-4 py-3 text-sm text-gray-400">在群里说点什么...</div>
+            <button className="px-5 rounded-full bg-orange-500 text-white text-sm font-bold">发送</button>
+          </div>
+        </div>
+      );
+
+      // 7. Chat 私聊页
+      const ScreenChat = ({ navigate, goBack }) => (
+        <div className="relative w-full h-full bg-[#F8FAFC] flex flex-col font-sans overflow-hidden">
+          <div className="bg-white px-4 pt-12 pb-4 sticky top-0 z-20 shadow-sm">
+            <div className="flex items-center gap-3">
+              <button onClick={goBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronLeft className="w-6 h-6" /></button>
+              <img src={interestUsers[0].avatar} className="w-10 h-10 rounded-2xl object-cover" alt="avatar" />
+              <div className="flex-1">
+                <p className="text-sm font-black text-gray-900">{interestUsers[0].name}</p>
+                <p className="text-[10px] text-gray-400">你们都在「{mainGroupData.name}」群里</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24 scrollbar-hide">
+            {chatMessages.map(msg => (
+              <div key={msg.id} className={`flex ${msg.mine ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-3xl px-4 py-3 shadow-sm ${msg.mine ? 'bg-orange-500 text-white rounded-br-md' : 'bg-white text-gray-800 rounded-bl-md border border-gray-100'}`}>
+                  <p className="text-sm leading-relaxed">{msg.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="absolute bottom-0 w-full bg-white border-t border-gray-100 p-4 pb-8 z-30 flex gap-3">
+            <div className="flex-1 bg-gray-50 rounded-full px-4 py-3 text-sm text-gray-400">继续聊路线和集合时间...</div>
+            <button className="px-5 rounded-full bg-gray-900 text-white text-sm font-bold">发送</button>
+          </div>
+        </div>
+      );
+
+      // 8. Profile 旅行社交主页
+      const ScreenProfileGamification = ({ navigate, goBack }) => {
+        return (
+          <div className="relative w-full h-full bg-gray-50 flex flex-col font-sans overflow-hidden">
+            <div className="bg-gray-900 px-5 pt-12 pb-6 relative overflow-hidden">
+              <img src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover opacity-30" alt="cover" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/50 to-black/80"></div>
+              <div className="relative z-10">
+                <div className="flex justify-between items-center mb-6"><button onClick={goBack} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white"><ChevronLeft className="w-5 h-5" /></button><Settings className="w-5 h-5 text-white/70" /></div>
+                <div className="flex items-center gap-4">
+                  <img src={userProfileData.avatar} className="w-20 h-20 rounded-[28px] object-cover border border-white/20" alt="avatar" />
+                  <div className="flex-1">
+                    <h2 className="text-xl font-black text-white">{userProfileData.name}</h2>
+                    <p className="text-sm text-white/70 mt-1">喜欢城市夜游和本地小吃，出门前一定做攻略，但现场也愿意临时改计划。</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-5">
+                  {profileSections.tags.map(tag => <span key={tag} className="px-3 py-1.5 rounded-full bg-white/10 text-white text-[11px] font-bold">{tag}</span>)}
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-gray-50 pb-24 scrollbar-hide px-5 py-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => navigate('chat')} className="rounded-2xl py-3.5 bg-gray-900 text-white text-sm font-bold">发私聊</button>
+                <button onClick={() => navigate('group')} className="rounded-2xl py-3.5 bg-orange-500 text-white text-sm font-bold">查看群组</button>
+              </div>
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-900 mb-3">最近去过</h3>
+                <div className="flex flex-wrap gap-2">{profileSections.visited.map(item => <span key={item} className="px-3 py-2 rounded-2xl bg-gray-100 text-gray-700 text-xs font-bold">{item}</span>)}</div>
+              </div>
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <h3 className="font-black text-gray-900 mb-3">接下来想去</h3>
+                <div className="flex flex-wrap gap-2">{profileSections.wishes.map(item => <span key={item} className="px-3 py-2 rounded-2xl bg-orange-50 text-orange-600 text-xs font-bold">{item}</span>)}</div>
+              </div>
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-3"><h3 className="font-black text-gray-900">发布内容</h3><button onClick={() => navigate('review')} className="text-orange-500 text-[11px] font-bold">去发布</button></div>
+                <div className="grid grid-cols-2 gap-3">
+                  {profileSections.posts.map(post => (
+                    <div key={post.id} className="rounded-2xl overflow-hidden bg-gray-50 border border-gray-100">
+                      <img src={post.cover} className="w-full h-24 object-cover" alt={post.title} />
+                      <div className="p-3"><p className="text-xs font-bold text-gray-800 leading-relaxed">{post.title}</p></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between"><h3 className="font-black text-gray-900">最近活跃群组</h3><button onClick={() => navigate('group')} className="text-orange-500 text-[11px] font-bold">进入</button></div>
+                <div className="mt-3 p-3 rounded-2xl bg-gray-50 border border-gray-100">
+                  <p className="text-sm font-black text-gray-900">{mainGroupData.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">{mainGroupData.schedule} · {mainGroupData.mode}</p>
+                </div>
+              </div>
+            </div>
+            <BottomNav navigate={navigate} active="profile" />
+          </div>
+        );
+      };
+
+      // 5. AITripPlanner 智能规划 (精简重制版)
+      const ScreenAITripPlanner = ({ navigate }) => {
+        return (
+          <div className="relative w-full h-full bg-[#F3F4F6] flex flex-col font-sans overflow-hidden">
+            <div className="bg-white px-5 pt-12 pb-4 shadow-sm z-20">
+              <h1 className="text-2xl font-black text-gray-900 mb-1">AI 行程规划</h1>
+              <p className="text-sm text-gray-500">只需几秒，为您定制专属旅游路线</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 pb-24 space-y-5">
+              <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+                 <label className="text-sm font-bold text-gray-900 block mb-3">我想去探索...</label>
+                 <input type="text" placeholder="输入国家或城市 (如: 冰岛、京都)" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm mb-4 outline-none focus:ring-2 ring-orange-500/50" />
+                 <label className="text-sm font-bold text-gray-900 block mb-3">旅行天数</label>
+                 <input type="number" placeholder="例如: 5 天" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none" />
+              </div>
+              <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"><Wallet className="w-4 h-4 text-gray-400" /> 您的旅行预算</h3>
+                 <div className="grid grid-cols-3 gap-3">
+                   {[{ id: 'low', label: '穷游背包', icon: '🎒' }, { id: 'medium', label: '舒适体验', icon: '🧳' }, { id: 'high', label: '豪华度假', icon: '💎' }].map(b => (
+                     <button key={b.id} className={`p-3 rounded-2xl border text-center transition-all ${b.id === 'medium' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-200 text-gray-500'}`}>
+                       <div className="text-xl mb-1">{b.icon}</div><div className="text-xs font-bold">{b.label}</div>
+                     </button>
+                   ))}
+                 </div>
+              </div>
+              <button onClick={() => alert('行程生成中... (演示版本)')} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full py-4 font-bold flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 active:scale-95 transition-transform"><Sparkles className="w-5 h-5" /> 生成专属行程</button>
+            </div>
+            <BottomNav navigate={navigate} active="planner" />
+          </div>
+        );
+      };
+
+      // ================= 主应用 Router =================
+      function App() {
+        const [currentPage, setCurrentPage] = useState('onboarding');
+        const [pageHistory, setPageHistory] = useState(['onboarding']);
+
+        const navigate = (page) => {
+          setCurrentPage(prev => {
+            if (prev === page) return prev;
+            setPageHistory(history => [...history, page]);
+            return page;
+          });
+        };
+
+        const goBack = () => {
+          setPageHistory(history => {
+            if (history.length <= 1) {
+              setCurrentPage('home');
+              return ['home'];
+            }
+            const nextHistory = history.slice(0, -1);
+            setCurrentPage(nextHistory[nextHistory.length - 1]);
+            return nextHistory;
+          });
+        };
+
+        return (
+          <div className="relative w-full h-screen bg-gray-900 overflow-hidden font-sans flex flex-col justify-center items-center">
+            <style>{globalStyles}</style>
+
+            {/* 统一唯一的手机壳模拟 */}
+            <div className="relative w-full h-full sm:w-[375px] sm:h-[812px] sm:rounded-[3rem] sm:border-[8px] border-gray-800 bg-black overflow-hidden shadow-2xl flex flex-col">
+
+              {currentPage === 'onboarding' && <ScreenOnboarding navigate={navigate} />}
+              {currentPage === 'home' && <ScreenHomeFeed navigate={navigate} />}
+              {currentPage === 'detail' && <ScreenPlaceDetail navigate={navigate} goBack={goBack} />}
+              {currentPage === 'interest' && <ScreenInterestUsers navigate={navigate} goBack={goBack} />}
+              {currentPage === 'social' && <ScreenSocial navigate={navigate} />}
+              {currentPage === 'review' && <ScreenWriteReview navigate={navigate} goBack={goBack} />}
+              {currentPage === 'group' && <ScreenGroup navigate={navigate} goBack={goBack} />}
+              {currentPage === 'chat' && <ScreenChat navigate={navigate} goBack={goBack} />}
+              {currentPage === 'planner' && <ScreenAITripPlanner navigate={navigate} />}
+              {currentPage === 'profile' && <ScreenProfileGamification navigate={navigate} goBack={goBack} />}
+
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
